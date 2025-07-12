@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from app.database import get_db
 from app.crud import _create_contest, _get_contest, _create_problem, _get_problem
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from datetime import datetime
@@ -9,6 +9,7 @@ from app.models import ProblemContestMappersCreate, ProblemContestMappers, User,
 from typing import Annotated, List
 from sqlalchemy.future import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from .database import engine
 
 
 
@@ -55,11 +56,37 @@ async def add_problem_to_contest(
 
 
 
+# Add these to your existing imports
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    async with AsyncSession(engine) as session:
+        result = await session.execute(select(User).where(User.username == username))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise credentials_exception
+        return user
+
 @app.get("/contests/{contest_id}/problems", response_model=List[Problems])
 async def get_contest_problems(
     contest_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(get_current_user)  # This enforces JWT auth
 ):
+    """Get all problems for a specific contest (JWT required)"""
     # Verify contest exists
     contest = await db.get(Contests, contest_id)
     if not contest:
