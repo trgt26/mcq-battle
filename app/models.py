@@ -31,11 +31,30 @@ class ProblemContestMappers(SQLModel, table=True):
     problem_id: int = Field(foreign_key="problems.id")
 
 
+class ProblemContestMappersCreate(SQLModel):
+    problem_id: List[int]
+
+
 class Submissions(SQLModel, table=True):
     __tablename__ = "submissions"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     contest_id: int = Field(foreign_key="contests.id")
 
-class ProblemContestMappersCreate(SQLModel):
-    problem_id: List[int]
+
+class User(SQLModel, table=True):
+    __tablename__ = "users"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(max_length=50, unique=True, nullable=False)
+    email: str = Field(max_length=100, unique=True, nullable=False)
+    password: str = Field(max_length=100, unique=False, nullable=False)
+
+
+class Results(SQLModel, table=True):
+    __tablename__ = "results"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", nullable=False)
+    contest_id: str = Field(max_length=100, nullable=False)
+    score: int = Field(nullable=False)
